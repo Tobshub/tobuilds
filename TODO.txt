@@ -1,0 +1,11 @@
+Outcomes:
+
+o Handle _per platform_ installation of an application
+o Install external dependencies to specified folder/file
+  o Allow link to ext dep download link (per platform)
+  o Allow path to ext dep to include in build (per platform)
+  o Expose variables like "$HOME" or "$CONFIG" for download path
+  o If download path is relative append to root dir from config
+  o Consider other options
+o Single config file
+  o Build with config file and run build anywhere(cross platform)
