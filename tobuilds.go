@@ -25,7 +25,7 @@ type Ctx struct {
 
 func Init(efs *embed.FS) *Ctx { return &Ctx{efs} }
 
-var pendingFiles []*os.File = []*os.File{}
+var tmpFiles []*os.File = []*os.File{}
 
 func (c *Ctx) Run(platform Platform, value string, options ...string) {
 	if platform != PlatformAny && runtime.GOOS != string(platform) {
@@ -33,35 +33,28 @@ func (c *Ctx) Run(platform Platform, value string, options ...string) {
 		return
 	}
 
-	var f *os.File
+	var reader io.Reader
 	if isLocalFile(value) {
-		f = c.getEmbededFile(value)
+		reader = c.getEmbededFile(value)
 	} else {
-		f = getFromWeb(value)
+		r := getFromWeb(value)
+		defer r.Close()
+		reader = r
 	}
-	pendingFiles = append(pendingFiles, f)
+
+	f, err := createTempFile(reader)
+	if err != nil {
+		panic(err)
+	}
+
+	tmpFiles = append(tmpFiles, f)
 	runFile(f, options)
 }
 
-// TODO: listen for program end then run
-func cleanUpFiles() {
-	for _, f := range pendingFiles {
+func End() {
+	for _, f := range tmpFiles {
 		os.Remove(f.Name())
 	}
-}
-
-func getFromWeb(u string) *os.File {
-	resp, err := http.Get(u)
-	if err != nil {
-		panic(err)
-	}
-
-	defer resp.Body.Close()
-	f, err := createTempFile(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-	return f
 }
 
 func createTempFile(src io.Reader) (*os.File, error) {
@@ -84,20 +77,25 @@ func isLocalFile(value string) bool {
 	return err != nil || u.Scheme == "" || u.Host == ""
 }
 
-func (c *Ctx) getEmbededFile(file string) *os.File {
+func getFromWeb(u string) io.ReadCloser {
+	resp, err := http.Get(u)
+	if err != nil {
+		panic(err)
+	}
+	return resp.Body
+}
+
+func (c *Ctx) getEmbededFile(file string) io.Reader {
 	data, err := c.embedFs.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}
-
-	f, err := createTempFile(bytes.NewReader(data))
-	if err != nil {
-		panic(err)
-	}
-	return f
+	return bytes.NewReader(data)
 }
 
 // TODO: implement
+// detect file type(?)
+// go utility to run based on ext(?)
 func runFile(f *os.File, options []string) {
 	buf, err := os.ReadFile(f.Name())
 	if err != nil {
