@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"runtime"
 )
 
@@ -19,46 +20,83 @@ const (
 	PlatformWindows Platform = "windows"
 )
 
-type Ctx struct {
-	embedFs *embed.FS
-}
+func (p Platform) isCurrent() bool { return string(p) == runtime.GOOS || p == PlatformAny }
+
+type Ctx struct{ embedFs *embed.FS }
 
 func Init(efs *embed.FS) *Ctx { return &Ctx{efs} }
 
-var tmpFiles []*os.File = []*os.File{}
-
-func (c *Ctx) Run(platform Platform, value string, options ...string) {
-	if platform != PlatformAny && runtime.GOOS != string(platform) {
-		fmt.Println("skipped run for different platform")
-		return
-	}
-
+func (c *Ctx) GetFile(name string) (*os.File, error) {
 	var reader io.Reader
-	if isLocalFile(value) {
-		reader = c.getEmbededFile(value)
+	var err error
+	if isLocalFile(name) {
+		reader, err = c.getEmbededFile(name)
 	} else {
-		r := getFromWeb(value)
+		var r io.ReadCloser
+		r, err = getFromWeb(name)
 		defer r.Close()
 		reader = r
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
 	f, err := createTempFile(reader)
+	return f, err
+}
+
+func (c *Ctx) Run(platform Platform, name string, options ...string) error {
+	if !platform.isCurrent() {
+		fmt.Println("skipped run for different platform")
+		return nil
+	}
+
+	f, err := c.GetFile(name)
+	if err != nil {
+		return err
+	}
+	return runFile(f, options)
+}
+
+func (c *Ctx) RunFile(platform Platform, f *os.File, options ...string) error {
+	if !platform.isCurrent() {
+		fmt.Println("skipped run for different platform")
+		return nil
+	}
+
+	return runFile(f, options)
+}
+
+func (c *Ctx) NewPlatformRunner(platform Platform) *Runner { return &Runner{platform, c} }
+
+type Runner struct {
+	platform Platform
+	ctx      *Ctx
+}
+
+func (r *Runner) Run(name string, options ...string) error {
+	return r.ctx.Run(r.platform, name, options...)
+}
+
+func (r *Runner) RunFile(f *os.File, options ...string) error {
+	return r.ctx.RunFile(r.platform, f, options...)
+}
+
+var tmpDir = func() string {
+	dir, err := os.MkdirTemp("", "tobuilds_tmp_dir_*")
 	if err != nil {
 		panic(err)
 	}
-
-	tmpFiles = append(tmpFiles, f)
-	runFile(f, options)
-}
+	return dir
+}()
 
 func End() {
-	for _, f := range tmpFiles {
-		os.Remove(f.Name())
-	}
+	os.RemoveAll(tmpDir)
 }
 
 func createTempFile(src io.Reader) (*os.File, error) {
-	out, err := os.CreateTemp("", "tobuilds_download_*")
+	out, err := os.CreateTemp(tmpDir, "tobuilds_tmp_*")
 	if err != nil {
 		return nil, err
 	}
@@ -77,29 +115,38 @@ func isLocalFile(value string) bool {
 	return err != nil || u.Scheme == "" || u.Host == ""
 }
 
-func getFromWeb(u string) io.ReadCloser {
+func getFromWeb(u string) (io.ReadCloser, error) {
 	resp, err := http.Get(u)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return resp.Body
+	return resp.Body, nil
 }
 
-func (c *Ctx) getEmbededFile(file string) io.Reader {
+func (c *Ctx) getEmbededFile(file string) (io.Reader, error) {
 	data, err := c.embedFs.ReadFile(file)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return bytes.NewReader(data)
+	return bytes.NewReader(data), nil
 }
 
 // TODO: implement
-// detect file type(?)
-// go utility to run based on ext(?)
-func runFile(f *os.File, options []string) {
-	buf, err := os.ReadFile(f.Name())
+func runFile(f *os.File, options []string) error {
+	err := makeExecutable(f)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	fmt.Println(string(buf), options)
+
+	res, err := exec.Command(f.Name(), options...).CombinedOutput()
+	fmt.Print("OUT: ", string(res))
+	return err
+}
+
+func makeExecutable(f *os.File) error {
+	if runtime.GOOS != string(PlatformLinux) {
+		return nil
+	}
+	cmd := exec.Command("chmod", "u+x", f.Name())
+	return cmd.Run()
 }
