@@ -12,6 +12,13 @@ var efs embed.FS
 
 func TestRun(t *testing.T) {
 	c := tobuilds.Init(&efs)
-	c.Run(tobuilds.PlatformAny, "test/test.sh")
+	err := c.Run(tobuilds.PlatformLinux, "test/test.sh")
+	err = c.Run(tobuilds.PlatformLinux,
+		"https://github.com/tobsdb/tobsdb/releases/download/v0.1.2-alpha/tdb-generate_Linux_x86_64", "-schema", "$TABLE a {\nb String\n}")
+	err = c.Run(tobuilds.PlatformWindows,
+		"https://github.com/tobsdb/tobsdb/releases/download/v0.1.2-alpha/tdb-generate_Windows_x86_64.exe", "-schema", "$TABLE a {\nb String\n}")
 	tobuilds.End()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
