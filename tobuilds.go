@@ -43,12 +43,13 @@ func (c *Ctx) GetFile(name string) (*os.File, error) {
 	}
 
 	f, err := createTempFile(reader)
+	fmt.Printf("INFO: Created %s from %s\n", f.Name(), name)
 	return f, err
 }
 
 func (c *Ctx) Run(platform Platform, name string, options ...string) error {
 	if !platform.isCurrent() {
-		fmt.Println("skipped run for different platform")
+		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", name, options)
 		return nil
 	}
 
@@ -56,15 +57,18 @@ func (c *Ctx) Run(platform Platform, name string, options ...string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("RUN:", name, options)
 	return runFile(f, options)
 }
 
 func (c *Ctx) RunFile(platform Platform, f *os.File, options ...string) error {
 	if !platform.isCurrent() {
-		fmt.Println("skipped run for different platform")
+		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", f.Name(), options)
 		return nil
 	}
 
+	fmt.Println("RUN:", f.Name(), options)
 	return runFile(f, options)
 }
 
@@ -92,6 +96,7 @@ var tmpDir = func() string {
 }()
 
 func End() {
+	fmt.Println("INFO: Cleaning up", tmpDir)
 	os.RemoveAll(tmpDir)
 }
 
