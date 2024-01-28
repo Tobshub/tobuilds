@@ -25,11 +25,12 @@ func (a *ArchiveTarGz) newArchiveTarGzReader() (*tar.Reader, error) {
 	}
 
 	tr := tar.NewReader(gz)
+	fmt.Println("INFO: read from archive", a.name)
 	return tr, nil
 }
 
 func newArchiveTarGz(ctx *Ctx, platform Platform, name string) *ArchiveTarGz {
-	fmt.Println("INFO: registered new archive", name)
+	fmt.Println("INFO: registered new tar.gz archive", name)
 	return &ArchiveTarGz{ctx, platform, name}
 }
 
@@ -55,7 +56,7 @@ func (a *ArchiveTarGz) Run(name string, options ...string) error {
 				return err
 			}
 			f.Close()
-			fmt.Printf("INFO: run %s from archive\n", name)
+			fmt.Printf("INFO: run %s from archive %s\n", name, a.name)
 			return RunFile(a.Platform, f, options...)
 		}
 	}
