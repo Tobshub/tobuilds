@@ -1,7 +1,6 @@
 package tobuilds
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
 	"io"
@@ -39,7 +38,7 @@ func (c *Ctx) GetFile(name string) (*os.File, error) {
 }
 
 func (c *Ctx) getFileOpen(name string) (*os.File, error) {
-	var reader io.Reader
+	var reader io.ReadCloser
 	var err error
 	var location string
 	if isLocalFile(name) {
@@ -47,15 +46,13 @@ func (c *Ctx) getFileOpen(name string) (*os.File, error) {
 		reader, err = c.getEmbededFile(name)
 	} else {
 		location = "web"
-		var r io.ReadCloser
-		r, err = getFromWeb(name)
-		defer r.Close()
-		reader = r
+		reader, err = getFromWeb(name)
 	}
 
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
 	f, err := createTempFile(reader)
 	fmt.Printf("INFO: Created %s from %s (%s)\n", f.Name(), name, location)
@@ -144,12 +141,12 @@ func getFromWeb(u string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func (c *Ctx) getEmbededFile(name string) (io.Reader, error) {
-	data, err := c.embedFs.ReadFile(name)
+func (c *Ctx) getEmbededFile(name string) (io.ReadCloser, error) {
+	f, err := c.embedFs.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	return bytes.NewReader(data), nil
+	return f, nil
 }
 
 // TODO: implement
