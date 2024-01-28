@@ -26,12 +26,27 @@ type Ctx struct{ embedFs *embed.FS }
 
 func Init(efs *embed.FS) *Ctx { return &Ctx{efs} }
 
+// Get a resource from the local embeded filesystem or the web
+//
+// Returns a closed temporary file with the contents of the resource
 func (c *Ctx) GetFile(name string) (*os.File, error) {
+	f, err := c.getFileOpen(name)
+	if err != nil {
+		return nil, err
+	}
+	f.Close()
+	return f, nil
+}
+
+func (c *Ctx) getFileOpen(name string) (*os.File, error) {
 	var reader io.Reader
 	var err error
+	var location string
 	if isLocalFile(name) {
+		location = "embed"
 		reader, err = c.getEmbededFile(name)
 	} else {
+		location = "web"
 		var r io.ReadCloser
 		r, err = getFromWeb(name)
 		defer r.Close()
@@ -43,7 +58,7 @@ func (c *Ctx) GetFile(name string) (*os.File, error) {
 	}
 
 	f, err := createTempFile(reader)
-	fmt.Printf("INFO: Created %s from %s\n", f.Name(), name)
+	fmt.Printf("INFO: Created %s from %s (%s)\n", f.Name(), name, location)
 	return f, err
 }
 
@@ -62,6 +77,7 @@ func (c *Ctx) Run(platform Platform, name string, options ...string) error {
 	return runFile(f, options)
 }
 
+// NOTE: The file must be closed
 func (c *Ctx) RunFile(platform Platform, f *os.File, options ...string) error {
 	if !platform.isCurrent() {
 		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", f.Name(), options)
@@ -105,7 +121,6 @@ func createTempFile(src io.Reader) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer out.Close()
 
 	_, err = io.Copy(out, src)
 	if err != nil {
@@ -121,6 +136,7 @@ func isLocalFile(value string) bool {
 }
 
 func getFromWeb(u string) (io.ReadCloser, error) {
+	fmt.Println("INFO: start download", u)
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, err
@@ -128,8 +144,8 @@ func getFromWeb(u string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func (c *Ctx) getEmbededFile(file string) (io.Reader, error) {
-	data, err := c.embedFs.ReadFile(file)
+func (c *Ctx) getEmbededFile(name string) (io.Reader, error) {
+	data, err := c.embedFs.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
