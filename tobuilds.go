@@ -29,7 +29,13 @@ func Init(efs *embed.FS) *Ctx { return &Ctx{efs} }
 //
 // Returns a closed temporary file with the contents of the resource
 func (c *Ctx) GetFile(name string) (*os.File, error) {
-	f, err := c.getFileOpen(name)
+	r, err := c.fileReadCloser(name)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	f, err := createTempFile(r)
 	if err != nil {
 		return nil, err
 	}
@@ -37,26 +43,22 @@ func (c *Ctx) GetFile(name string) (*os.File, error) {
 	return f, nil
 }
 
-func (c *Ctx) getFileOpen(name string) (*os.File, error) {
-	var reader io.ReadCloser
-	var err error
-	var location string
-	if isLocalFile(name) {
-		location = "embed"
-		reader, err = c.getEmbededFile(name)
+func (c *Ctx) fileReadCloser(name string) (r io.ReadCloser, err error) {
+	isLocal, location := isLocalFile(name), ""
+	if isLocal {
+		location = "local"
+		r, err = c.getEmbededFile(name)
 	} else {
 		location = "web"
-		reader, err = getFromWeb(name)
+		r, err = getFromWeb(name)
 	}
 
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
 
-	f, err := createTempFile(reader)
-	fmt.Printf("INFO: Created %s from %s (%s)\n", f.Name(), name, location)
-	return f, err
+	fmt.Printf("INFO: read %s (%s)\n", name, location)
+	return r, err
 }
 
 func (c *Ctx) Run(platform Platform, name string, options ...string) error {
@@ -75,7 +77,7 @@ func (c *Ctx) Run(platform Platform, name string, options ...string) error {
 }
 
 // NOTE: The file must be closed
-func (c *Ctx) RunFile(platform Platform, f *os.File, options ...string) error {
+func RunFile(platform Platform, f *os.File, options ...string) error {
 	if !platform.isCurrent() {
 		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", f.Name(), options)
 		return nil
@@ -97,7 +99,7 @@ func (r *Runner) Run(name string, options ...string) error {
 }
 
 func (r *Runner) RunFile(f *os.File, options ...string) error {
-	return r.ctx.RunFile(r.platform, f, options...)
+	return RunFile(r.platform, f, options...)
 }
 
 var tmpDir = func() string {
@@ -109,7 +111,7 @@ var tmpDir = func() string {
 }()
 
 func End() {
-	fmt.Println("INFO: Cleaning up", tmpDir)
+	fmt.Println("INFO: cleaning up", tmpDir)
 	os.RemoveAll(tmpDir)
 }
 
@@ -167,4 +169,18 @@ func makeExecutable(f *os.File) error {
 	}
 	cmd := exec.Command("chmod", "u+x", f.Name())
 	return cmd.Run()
+}
+
+type Archive interface {
+	Run(string, ...string) error
+	List() ([]string, error)
+}
+
+func (c *Ctx) NewArchiveTar(platform Platform, name string) (*ArchiveTar, error) {
+	if !platform.isCurrent() {
+		fmt.Printf("INFO: skipped extract (%s) for different platform\n", name)
+		return nil, nil
+	}
+
+	return newArchiveTar(c, platform, name)
 }
