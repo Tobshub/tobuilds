@@ -184,3 +184,12 @@ func (c *Ctx) NewArchiveTarGz(platform Platform, name string) *ArchiveTarGz {
 
 	return newArchiveTarGz(c, platform, name)
 }
+
+func (c *Ctx) NewArchiveZip(platform Platform, name string) (*ArchiveZip, error) {
+	if !platform.isCurrent() {
+		fmt.Printf("INFO: skipped extract (%s) for different platform\n", name)
+		return nil, nil
+	}
+
+	return newArchiveZip(c, platform, name)
+}

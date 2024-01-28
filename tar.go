@@ -23,6 +23,7 @@ func (a *ArchiveTarGz) newArchiveTarGzReader() (*tar.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer gz.Close()
 
 	tr := tar.NewReader(gz)
 	fmt.Println("INFO: read from archive", a.name)

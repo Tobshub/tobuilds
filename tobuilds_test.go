@@ -22,4 +22,7 @@ func TestRun(t *testing.T) {
 	tr := c.NewArchiveTarGz(tobuilds.PlatformLinux, "test/test.tar.gz")
 	assert.NilError(t, tr.Run("test.sh", "test two"))
 	assert.NilError(t, tr.Run("test.sh", "test three"))
+	z, err := c.NewArchiveZip(tobuilds.PlatformLinux, "test/test.zip")
+	assert.NilError(t, err)
+	assert.NilError(t, z.Run("test.sh", "test four"))
 }
