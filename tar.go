@@ -7,15 +7,14 @@ import (
 	"io"
 )
 
-type ArchiveTar struct {
+type ArchiveTarGz struct {
 	ctx *Ctx
 	Platform
-	Name string
-	tr   *tar.Reader
+	name string
 }
 
-func newArchiveTar(ctx *Ctx, platform Platform, name string) (*ArchiveTar, error) {
-	r, err := ctx.fileReadCloser(name)
+func (a *ArchiveTarGz) newArchiveTarGzReader() (*tar.Reader, error) {
+	r, err := a.ctx.fileReadCloser(a.name)
 	if err != nil {
 		return nil, err
 	}
@@ -25,26 +24,33 @@ func newArchiveTar(ctx *Ctx, platform Platform, name string) (*ArchiveTar, error
 		return nil, err
 	}
 
-	archive := ArchiveTar{
-		ctx, platform,
-		name, tar.NewReader(gz),
-	}
-	fmt.Println("INFO: extracted new archive", name)
-	return &archive, nil
+	tr := tar.NewReader(gz)
+	return tr, nil
 }
 
-func (a *ArchiveTar) Run(name string, options ...string) error {
+func newArchiveTarGz(ctx *Ctx, platform Platform, name string) *ArchiveTarGz {
+	fmt.Println("INFO: registered new archive", name)
+	return &ArchiveTarGz{ctx, platform, name}
+}
+
+func (a *ArchiveTarGz) Run(name string, options ...string) error {
+	tr, err := a.newArchiveTarGzReader()
+	if err != nil {
+		return err
+	}
+
 	for {
-		hdr, err := a.tr.Next()
+		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return err
 		}
 
 		if hdr.Name == name {
-			f, err := createTempFile(a.tr)
+			f, err := createTempFile(tr)
 			if err != nil {
 				return err
 			}
@@ -54,4 +60,23 @@ func (a *ArchiveTar) Run(name string, options ...string) error {
 		}
 	}
 	return nil
+}
+
+func (a *ArchiveTarGz) List() ([]string, error) {
+	tr, err := a.newArchiveTarGzReader()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, hdr.Name)
+	}
+	return names, nil
 }

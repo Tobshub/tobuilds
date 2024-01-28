@@ -176,11 +176,11 @@ type Archive interface {
 	List() ([]string, error)
 }
 
-func (c *Ctx) NewArchiveTar(platform Platform, name string) (*ArchiveTar, error) {
+func (c *Ctx) NewArchiveTarGz(platform Platform, name string) *ArchiveTarGz {
 	if !platform.isCurrent() {
 		fmt.Printf("INFO: skipped extract (%s) for different platform\n", name)
-		return nil, nil
+		return nil
 	}
 
-	return newArchiveTar(c, platform, name)
+	return newArchiveTarGz(c, platform, name)
 }

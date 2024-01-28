@@ -1,3 +1,3 @@
 #!/usr/bin/bash
 
-echo HELLO WORLD
+echo HELLO WORLD $@
