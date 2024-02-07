@@ -29,6 +29,11 @@ func newArchiveZip(ctx *Ctx, platform Platform, name string) (*ArchiveZip, error
 }
 
 func (a *ArchiveZip) Run(name string, options ...string) error {
+	if !a.Platform.isCurrent() {
+		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", name, options)
+		return nil
+	}
+
 	for _, f := range a.z.File {
 		if f.Name == name {
 			r, err := f.Open()

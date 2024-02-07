@@ -36,6 +36,11 @@ func newArchiveTarGz(ctx *Ctx, platform Platform, name string) *ArchiveTarGz {
 }
 
 func (a *ArchiveTarGz) Run(name string, options ...string) error {
+	if !a.Platform.isCurrent() {
+		fmt.Printf("INFO: skipped run (%s %s) for different platform\n", name, options)
+		return nil
+	}
+
 	tr, err := a.newArchiveTarGzReader()
 	if err != nil {
 		return err

@@ -171,11 +171,6 @@ func makeExecutable(f *os.File) error {
 	return cmd.Run()
 }
 
-type Archive interface {
-	Run(string, ...string) error
-	List() ([]string, error)
-}
-
 func (c *Ctx) NewArchiveTarGz(platform Platform, name string) *ArchiveTarGz {
 	if !platform.isCurrent() {
 		fmt.Printf("INFO: skipped extract (%s) for different platform\n", name)
