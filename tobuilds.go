@@ -188,3 +188,12 @@ func (c *Ctx) NewArchiveZip(platform Platform, name string) (*ArchiveZip, error)
 
 	return newArchiveZip(c, platform, name)
 }
+
+func (c *Ctx) NewMSI(name string) *MSI {
+	if !PlatformWindows.isCurrent() {
+		fmt.Printf("INFO: skipped msi (%s) for different platform\n", name)
+		return nil
+	}
+
+	return newMSI(c, name)
+}
